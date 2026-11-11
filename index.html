@@ -5,12 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Video Metadata Forger</title>
     
-    <!-- SCRIPT WAJIB UNTUK GITHUB PAGES (Mengatasi error stuck memuat FFmpeg) -->
     <script src="https://cdn.jsdelivr.net/npm/coi-serviceworker@0.1.6-4/coi-serviceworker.min.js"></script>
     
-    <!-- Tailwind CSS untuk tampilan rapi -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FFmpeg WASM untuk memproses video langsung di browser -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
 </head>
@@ -20,16 +17,13 @@
         <h1 class="text-2xl font-bold mb-2 text-center text-cyan-400">Video Metadata Forger</h1>
         <p class="text-sm text-gray-400 mb-6 text-center">Metadata asli akan <b>otomatis dihapus</b> dan diganti dengan data di bawah ini.</p>
 
-        <!-- Form Input -->
         <div class="space-y-4">
-            <!-- Input Video -->
             <div class="bg-gray-750 p-4 rounded-lg border border-gray-600 border-dashed space-y-4">
                 <div>
                     <label class="block text-sm font-semibold mb-2 text-cyan-300">1. Pilih File Video:</label>
                     <input type="file" id="videoFile" accept="video/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer">
                 </div>
                 
-                <!-- Input Nama File Baru -->
                 <div>
                     <label class="block text-sm font-semibold mb-1 text-cyan-300">Nama File Hasil (opsional):</label>
                     <div class="flex items-center">
@@ -78,15 +72,13 @@
             </button>
         </div>
 
-        <!-- Status & Progress -->
         <div id="statusBox" class="mt-6 hidden">
-            <p id="statusText" class="text-sm text-center text-yellow-400 mb-2">Memuat engine FFmpeg ke memori browser...</p>
+            <p id="statusText" class="text-sm text-center text-yellow-400 mb-2">Memuat engine FFmpeg ke memori browser (harap tunggu)...</p>
             <div class="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
                 <div id="progressBar" class="bg-cyan-500 h-2.5 w-0 transition-all duration-300"></div>
             </div>
         </div>
 
-        <!-- Tombol Download -->
         <div id="downloadContainer" class="mt-6 hidden">
             <a id="downloadBtn" class="block text-center bg-green-500 hover:bg-green-600 font-bold py-3 rounded-lg transition duration-200 shadow-lg text-white">
                 UNDUH VIDEO HASIL
@@ -95,7 +87,10 @@
     </div>
 
     <script>
+        // PERBAIKAN DI SINI: Mendeklarasikan FFmpegUtil agar toBlobURL dan fetchFile dikenali browser
         const { FFmpeg } = FFmpegWASM;
+        const { fetchFile, toBlobURL } = FFmpegUtil; 
+        
         let ffmpeg = null;
 
         async function loadFFmpeg() {
@@ -155,7 +150,8 @@
                 const inputName = 'input.mp4';
                 const outputName = 'output.mp4';
 
-                await ffmpeg.writeFile(inputName, await FFmpegWASM.fetchFile(file));
+                // PERBAIKAN DI SINI: Menggunakan fetchFile dengan benar
+                await ffmpeg.writeFile(inputName, await fetchFile(file));
 
                 let ffmpegArgs = [
                     '-i', inputName,
