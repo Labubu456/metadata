@@ -4,7 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Video Metadata Forger</title>
+    
+    <!-- SCRIPT WAJIB UNTUK GITHUB PAGES (Mengatasi error stuck memuat FFmpeg) -->
+    <script src="https://cdn.jsdelivr.net/npm/coi-serviceworker@0.1.6-4/coi-serviceworker.min.js"></script>
+    
+    <!-- Tailwind CSS untuk tampilan rapi -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FFmpeg WASM untuk memproses video langsung di browser -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
 </head>
@@ -27,7 +33,7 @@
                 <div>
                     <label class="block text-sm font-semibold mb-1 text-cyan-300">Nama File Hasil (opsional):</label>
                     <div class="flex items-center">
-                        <input type="text" id="outFileName" placeholder="Contoh: video_liburan" class="w-full bg-gray-700 border border-gray-600 rounded-l-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                        <input type="text" id="outFileName" placeholder="Contoh: IMG_1234" class="w-full bg-gray-700 border border-gray-600 rounded-l-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
                         <span class="bg-gray-600 border border-gray-600 rounded-r-lg p-2 text-sm text-gray-300">.mp4</span>
                     </div>
                 </div>
@@ -38,7 +44,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Perangkat (Make/Model):</label>
-                    <input type="text" id="metaDevice" placeholder="Contoh: Apple iPhone 14 Pro Max" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                    <input type="text" id="metaDevice" placeholder="Contoh: Apple iPhone 17 Pro Max" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
                 </div>
                 
                 <div>
@@ -53,17 +59,17 @@
 
                 <div>
                     <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Lokasi (GPS):</label>
-                    <input type="text" id="metaLocation" placeholder="Contoh: +37.7749-122.4194/" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                    <input type="text" id="metaLocation" placeholder="Contoh: +40.7128-074.0060/" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Teknis (Encoder/Software):</label>
-                    <input type="text" id="metaTech" placeholder="Contoh: Lavf59.27.100 atau Premiere Pro" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                    <input type="text" id="metaTech" placeholder="Contoh: Apple QuickTime" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Khusus iPhone (iOS Version):</label>
-                    <input type="text" id="metaIphone" placeholder="Contoh: iOS 17.2.1" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                    <input type="text" id="metaIphone" placeholder="Contoh: iOS 18.1" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
                 </div>
             </div>
 
@@ -74,7 +80,7 @@
 
         <!-- Status & Progress -->
         <div id="statusBox" class="mt-6 hidden">
-            <p id="statusText" class="text-sm text-center text-yellow-400 mb-2">Memuat sistem FFmpeg...</p>
+            <p id="statusText" class="text-sm text-center text-yellow-400 mb-2">Memuat engine FFmpeg ke memori browser...</p>
             <div class="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
                 <div id="progressBar" class="bg-cyan-500 h-2.5 w-0 transition-all duration-300"></div>
             </div>
@@ -98,14 +104,14 @@
             const statusText = document.getElementById('statusText');
             
             statusBox.classList.remove('hidden');
-            statusText.innerText = "Memuat engine FFmpeg ke memori browser...";
+            statusText.innerText = "Memuat engine FFmpeg ke memori browser (harap tunggu)...";
 
             ffmpeg = new FFmpeg();
             const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
             
             ffmpeg.on('log', ({ message }) => {
                 console.log(message);
-                if(message.includes('Processing')) {
+                if(message.includes('Processing') || message.includes('Duration')) {
                     statusText.innerText = "Sedang menyuntikkan metadata...";
                 }
             });
@@ -142,49 +148,55 @@
             downloadContainer.classList.add('hidden');
             statusBox.classList.remove('hidden');
 
-            await loadFFmpeg();
-            statusText.innerText = "Mengeksekusi penghapusan & penggantian data...";
+            try {
+                await loadFFmpeg();
+                statusText.innerText = "Mengeksekusi penghapusan & penggantian data...";
 
-            const inputName = 'input.mp4';
-            const outputName = 'output.mp4';
+                const inputName = 'input.mp4';
+                const outputName = 'output.mp4';
 
-            await ffmpeg.writeFile(inputName, await FFmpegWASM.fetchFile(file));
+                await ffmpeg.writeFile(inputName, await FFmpegWASM.fetchFile(file));
 
-            let ffmpegArgs = [
-                '-i', inputName,
-                '-map_metadata', '-1', 
-                '-c', 'copy'
-            ];
+                let ffmpegArgs = [
+                    '-i', inputName,
+                    '-map_metadata', '-1', 
+                    '-c', 'copy'
+                ];
 
-            if (device) ffmpegArgs.push('-metadata', `make=${device}`, '-metadata', `model=${device}`);
-            if (time) {
-                const formattedTime = time.replace('T', ' ') + ':00'; 
-                ffmpegArgs.push('-metadata', `creation_time=${formattedTime}`);
+                if (device) ffmpegArgs.push('-metadata', `make=${device}`, '-metadata', `model=${device}`);
+                if (time) {
+                    const formattedTime = time.replace('T', ' ') + ':00'; 
+                    ffmpegArgs.push('-metadata', `creation_time=${formattedTime}`);
+                }
+                if (camera) ffmpegArgs.push('-metadata', `camera_identifier=${camera}`);
+                if (location) ffmpegArgs.push('-metadata', `location=${location}`, '-metadata', `location-eng=${location}`);
+                if (tech) ffmpegArgs.push('-metadata', `encoder=${tech}`, '-metadata', `software=${tech}`);
+                if (iphone) ffmpegArgs.push('-metadata', `com.apple.quicktime.software=${iphone}`);
+
+                ffmpegArgs.push(outputName);
+
+                await ffmpeg.exec(ffmpegArgs);
+
+                const data = await ffmpeg.readFile(outputName);
+                const blob = new Blob([data.buffer], { type: file.type || 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                
+                const finalFileName = customFileName !== "" ? `${customFileName}.mp4` : 'video_baru.mp4';
+
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.href = url;
+                downloadBtn.download = finalFileName;
+                
+                statusBox.classList.add('hidden');
+                downloadContainer.classList.remove('hidden');
+            } catch (error) {
+                console.error(error);
+                statusText.innerText = "Terjadi kesalahan. Cek console (F12).";
+                statusText.classList.replace('text-yellow-400', 'text-red-500');
+            } finally {
+                processBtn.disabled = false;
+                processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
-            if (camera) ffmpegArgs.push('-metadata', `camera_identifier=${camera}`);
-            if (location) ffmpegArgs.push('-metadata', `location=${location}`, '-metadata', `location-eng=${location}`);
-            if (tech) ffmpegArgs.push('-metadata', `encoder=${tech}`, '-metadata', `software=${tech}`);
-            if (iphone) ffmpegArgs.push('-metadata', `com.apple.quicktime.software=${iphone}`);
-
-            ffmpegArgs.push(outputName);
-
-            await ffmpeg.exec(ffmpegArgs);
-
-            const data = await ffmpeg.readFile(outputName);
-            const blob = new Blob([data.buffer], { type: file.type || 'video/mp4' });
-            const url = URL.createObjectURL(blob);
-            
-            // Logika penamaan file baru
-            const finalFileName = customFileName !== "" ? `${customFileName}.mp4` : 'video_baru.mp4';
-
-            const downloadBtn = document.getElementById('downloadBtn');
-            downloadBtn.href = url;
-            downloadBtn.download = finalFileName;
-            
-            statusBox.classList.add('hidden');
-            downloadContainer.classList.remove('hidden');
-            processBtn.disabled = false;
-            processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
     </script>
 </body>
