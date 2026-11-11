@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Video Metadata Forger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+
+    <div class="max-w-2xl w-full bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
+        <h1 class="text-2xl font-bold mb-2 text-center text-cyan-400">Video Metadata Forger</h1>
+        <p class="text-sm text-gray-400 mb-6 text-center">Metadata asli akan <b>otomatis dihapus</b> dan diganti dengan data di bawah ini.</p>
+
+        <!-- Form Input -->
+        <div class="space-y-4">
+            <!-- Input Video -->
+            <div class="bg-gray-750 p-4 rounded-lg border border-gray-600 border-dashed space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-cyan-300">1. Pilih File Video:</label>
+                    <input type="file" id="videoFile" accept="video/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer">
+                </div>
+                
+                <!-- Input Nama File Baru -->
+                <div>
+                    <label class="block text-sm font-semibold mb-1 text-cyan-300">Nama File Hasil (opsional):</label>
+                    <div class="flex items-center">
+                        <input type="text" id="outFileName" placeholder="Contoh: video_liburan" class="w-full bg-gray-700 border border-gray-600 rounded-l-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                        <span class="bg-gray-600 border border-gray-600 rounded-r-lg p-2 text-sm text-gray-300">.mp4</span>
+                    </div>
+                </div>
+            </div>
+
+            <label class="block text-sm font-semibold mt-4 text-cyan-300 border-b border-gray-600 pb-1">2. Isi Data Palsu (Kosongkan jika tidak ingin diisi):</label>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Perangkat (Make/Model):</label>
+                    <input type="text" id="metaDevice" placeholder="Contoh: Apple iPhone 14 Pro Max" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-300">Waktu Perekaman:</label>
+                    <input type="datetime-local" id="metaTime" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500 text-gray-300">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Kamera (Lensa/Sensor):</label>
+                    <input type="text" id="metaCamera" placeholder="Contoh: Back Triple Camera 24mm f/1.78" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Lokasi (GPS):</label>
+                    <input type="text" id="metaLocation" placeholder="Contoh: +37.7749-122.4194/" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Teknis (Encoder/Software):</label>
+                    <input type="text" id="metaTech" placeholder="Contoh: Lavf59.27.100 atau Premiere Pro" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-300">Informasi Khusus iPhone (iOS Version):</label>
+                    <input type="text" id="metaIphone" placeholder="Contoh: iOS 17.2.1" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm focus:outline-none focus:border-cyan-500">
+                </div>
+            </div>
+
+            <button id="processBtn" onclick="processVideo()" class="w-full mt-4 bg-cyan-600 hover:bg-cyan-700 font-bold py-3 rounded-lg transition duration-200 shadow-lg text-white">
+                EKSEKUSI & UBAH VIDEO
+            </button>
+        </div>
+
+        <!-- Status & Progress -->
+        <div id="statusBox" class="mt-6 hidden">
+            <p id="statusText" class="text-sm text-center text-yellow-400 mb-2">Memuat sistem FFmpeg...</p>
+            <div class="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                <div id="progressBar" class="bg-cyan-500 h-2.5 w-0 transition-all duration-300"></div>
+            </div>
+        </div>
+
+        <!-- Tombol Download -->
+        <div id="downloadContainer" class="mt-6 hidden">
+            <a id="downloadBtn" class="block text-center bg-green-500 hover:bg-green-600 font-bold py-3 rounded-lg transition duration-200 shadow-lg text-white">
+                UNDUH VIDEO HASIL
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const { FFmpeg } = FFmpegWASM;
+        let ffmpeg = null;
+
+        async function loadFFmpeg() {
+            if (ffmpeg) return;
+            const statusBox = document.getElementById('statusBox');
+            const statusText = document.getElementById('statusText');
+            
+            statusBox.classList.remove('hidden');
+            statusText.innerText = "Memuat engine FFmpeg ke memori browser...";
+
+            ffmpeg = new FFmpeg();
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            
+            ffmpeg.on('log', ({ message }) => {
+                console.log(message);
+                if(message.includes('Processing')) {
+                    statusText.innerText = "Sedang menyuntikkan metadata...";
+                }
+            });
+
+            await ffmpeg.load({
+                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+            });
+        }
+
+        async function processVideo() {
+            const fileInput = document.getElementById('videoFile');
+            if (fileInput.files.length === 0) {
+                alert("Harap pilih file video terlebih dahulu!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const customFileName = document.getElementById('outFileName').value.trim();
+            const device = document.getElementById('metaDevice').value;
+            const time = document.getElementById('metaTime').value;
+            const camera = document.getElementById('metaCamera').value;
+            const location = document.getElementById('metaLocation').value;
+            const tech = document.getElementById('metaTech').value;
+            const iphone = document.getElementById('metaIphone').value;
+
+            const statusBox = document.getElementById('statusBox');
+            const statusText = document.getElementById('statusText');
+            const downloadContainer = document.getElementById('downloadContainer');
+            const processBtn = document.getElementById('processBtn');
+
+            processBtn.disabled = true;
+            processBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            downloadContainer.classList.add('hidden');
+            statusBox.classList.remove('hidden');
+
+            await loadFFmpeg();
+            statusText.innerText = "Mengeksekusi penghapusan & penggantian data...";
+
+            const inputName = 'input.mp4';
+            const outputName = 'output.mp4';
+
+            await ffmpeg.writeFile(inputName, await FFmpegWASM.fetchFile(file));
+
+            let ffmpegArgs = [
+                '-i', inputName,
+                '-map_metadata', '-1', 
+                '-c', 'copy'
+            ];
+
+            if (device) ffmpegArgs.push('-metadata', `make=${device}`, '-metadata', `model=${device}`);
+            if (time) {
+                const formattedTime = time.replace('T', ' ') + ':00'; 
+                ffmpegArgs.push('-metadata', `creation_time=${formattedTime}`);
+            }
+            if (camera) ffmpegArgs.push('-metadata', `camera_identifier=${camera}`);
+            if (location) ffmpegArgs.push('-metadata', `location=${location}`, '-metadata', `location-eng=${location}`);
+            if (tech) ffmpegArgs.push('-metadata', `encoder=${tech}`, '-metadata', `software=${tech}`);
+            if (iphone) ffmpegArgs.push('-metadata', `com.apple.quicktime.software=${iphone}`);
+
+            ffmpegArgs.push(outputName);
+
+            await ffmpeg.exec(ffmpegArgs);
+
+            const data = await ffmpeg.readFile(outputName);
+            const blob = new Blob([data.buffer], { type: file.type || 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            
+            // Logika penamaan file baru
+            const finalFileName = customFileName !== "" ? `${customFileName}.mp4` : 'video_baru.mp4';
+
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.href = url;
+            downloadBtn.download = finalFileName;
+            
+            statusBox.classList.add('hidden');
+            downloadContainer.classList.remove('hidden');
+            processBtn.disabled = false;
+            processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    </script>
+</body>
+</html>
